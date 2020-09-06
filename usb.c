@@ -1,19 +1,19 @@
 /*
-	VitaShell
-	Copyright (C) 2015-2017, TheFloW
+  VitaShell
+  Copyright (C) 2015-2018, TheFloW
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "main.h"
@@ -21,155 +21,195 @@
 #include "file.h"
 #include "utils.h"
 
-static int remount_thread(SceSize args, void *argp) {
-	remount(0x800);
-	return sceKernelExitDeleteThread(0);
+int mountGamecardUx0() {
+  // Destroy other apps
+  sceAppMgrDestroyOtherApp();
+
+  // Copy VitaShell
+  copyPath("ux0:app/VITASHELL", "ur0:temp/app", NULL);
+  copyPath("ux0:appmeta/VITASHELL", "ur0:temp/appmeta", NULL);
+  copyPath("ux0:license/app/VITASHELL", "ur0:temp/license", NULL);
+
+  // Redirect ux0: to gamecard
+  shellUserRedirectUx0("sdstor0:gcd-lp-ign-entire", "sdstor0:gcd-lp-ign-entire");
+
+  // Remount Memory Card
+  remount(0x800);
+
+  // Create dirs
+  sceIoMkdir("ux0:app", 0006);
+  sceIoMkdir("ux0:appmeta", 0006);
+  sceIoMkdir("ux0:license", 0006);
+  sceIoMkdir("ux0:license/app", 0006);
+  sceIoMkdir("ux0:app/VITASHELL", 0006);
+  sceIoMkdir("ux0:appmeta/VITASHELL", 0006);
+  sceIoMkdir("ux0:license/app/VITASHELL", 0006);
+
+  // Create important dirs
+  sceIoMkdir("ux0:data", 0777);
+  sceIoMkdir("ux0:temp", 0006);
+
+  // Remove lastdir.txt file
+  sceIoRemove("ux0:VitaShell/internal/lastdir.txt");
+
+  // Copy VitaShell
+  copyPath("ur0:temp/app", "ux0:app/VITASHELL", NULL);
+  copyPath("ur0:temp/appmeta", "ux0:appmeta/VITASHELL", NULL);
+  copyPath("ur0:temp/license", "ux0:license/app/VITASHELL", NULL);
+
+  return 0;
 }
 
-void remountRelaunch(char * const argv[]) {
-	SceUID thid = sceKernelCreateThread("remount_thread", (SceKernelThreadEntry)remount_thread, 0x40, 0x1000, 0, 0, NULL);
-	if (thid >= 0)
-		sceKernelStartThread(thid, 0, NULL);
-	
-	sceAppMgrLoadExec("app0:eboot.bin", argv, NULL);
+int umountGamecardUx0() {
+  // Destroy other apps
+  sceAppMgrDestroyOtherApp();
+
+  // Restore ux0: patch
+  if (checkFileExist("sdstor0:xmc-lp-ign-userext"))
+    shellUserRedirectUx0("sdstor0:xmc-lp-ign-userext", "sdstor0:xmc-lp-ign-userext");
+  else
+    shellUserRedirectUx0("sdstor0:int-lp-ign-userext", "sdstor0:int-lp-ign-userext");
+
+  // Remount Memory Card
+  remount(0x800);
+
+  return 0;
 }
 
 int mountUsbUx0() {
-	// Destroy other apps
-	sceAppMgrDestroyOtherApp();
+  // Destroy other apps
+  sceAppMgrDestroyOtherApp();
 
-	// Create dirs
-	sceIoMkdir("uma0:app", 0006);
-	sceIoMkdir("uma0:appmeta", 0006);
-	sceIoMkdir("uma0:license", 0006);
-	sceIoMkdir("uma0:license/app", 0006);
-	sceIoMkdir("uma0:app/MLCL00001", 0006);
-	sceIoMkdir("uma0:appmeta/MLCL00001", 0006);
-	sceIoMkdir("uma0:license/app/MLCL00001", 0006);
-	sceIoMkdir("uma0:app/VITASHELL", 0006);
-	sceIoMkdir("uma0:appmeta/VITASHELL", 0006);
-	sceIoMkdir("uma0:license/app/VITASHELL", 0006);
+  // Create dirs
+  sceIoMkdir("uma0:app", 0006);
+  sceIoMkdir("uma0:appmeta", 0006);
+  sceIoMkdir("uma0:license", 0006);
+  sceIoMkdir("uma0:license/app", 0006);
+  sceIoMkdir("uma0:app/VITASHELL", 0006);
+  sceIoMkdir("uma0:appmeta/VITASHELL", 0006);
+  sceIoMkdir("uma0:license/app/VITASHELL", 0006);
 
-	// Copy molecularShell and VitaShell
-	copyPath("ux0:app/MLCL00001", "uma0:app/MLCL00001", NULL);
-	copyPath("ux0:appmeta/MLCL00001", "uma0:appmeta/MLCL00001", NULL);
-	copyPath("ux0:license/app/MLCL00001", "uma0:license/app/MLCL00001", NULL);
-	copyPath("ux0:app/VITASHELL", "uma0:app/VITASHELL", NULL);
-	copyPath("ux0:appmeta/VITASHELL", "uma0:appmeta/VITASHELL", NULL);
-	copyPath("ux0:license/app/VITASHELL", "uma0:license/app/VITASHELL", NULL);
+  // Copy VitaShell
+  copyPath("ux0:app/VITASHELL", "uma0:app/VITASHELL", NULL);
+  copyPath("ux0:appmeta/VITASHELL", "uma0:appmeta/VITASHELL", NULL);
+  copyPath("ux0:license/app/VITASHELL", "uma0:license/app/VITASHELL", NULL);
 
-	// Create important dirs
-	sceIoMkdir("uma0:data", 0777);
-	sceIoMkdir("uma0:temp", 0006);
-	sceIoMkdir("uma0:temp/app_work/", 0006);
-	sceIoMkdir("uma0:temp/app_work/MLCL00001", 0006);
-	sceIoMkdir("uma0:temp/app_work/MLCL00001/rec", 0006);
+  // Create important dirs
+  sceIoMkdir("uma0:data", 0777);
+  sceIoMkdir("uma0:temp", 0006);
 
-	// Copy important files
-	copyPath("ux0:calendar", "uma0:calendar", NULL);
-	copyPath("ux0:mms", "uma0:mms", NULL);
-	copyPath("ux0:mtp", "uma0:mtp", NULL);
-	copyPath("ux0:temp/app_work/MLCL00001/rec/config.bin", "uma0:temp/app_work/MLCL00001/rec/config.bin", NULL);
-	copyPath("ux0:iconlayout.ini", "uma0:iconlayout.ini", NULL);
-	copyPath("ux0:id.dat", "uma0:id.dat", NULL);
+  // Remove lastdir.txt file
+  sceIoRemove("uma0:VitaShell/internal/lastdir.txt");
 
-	// Remove lastdir.txt file
-	sceIoRemove("uma0:VitaShell/internal/lastdir.txt");
+  // Redirect ux0: to uma0:
+  shellUserRedirectUx0("sdstor0:uma-pp-act-a", "sdstor0:uma-lp-act-entire");
 
-	// Redirect ux0: to uma0:
-	shellUserRedirectUx0();
+  // Umount uma0:
+  vshIoUmount(0xF00, 0, 0, 0);
 
-	// Mount USB ux0:
-	vshIoUmount(0xF00, 0, 0, 0);
-	
-	// Remount and relaunch
-	char * const argv[] = { "mount", NULL };
-	remountRelaunch(argv);
+  // Remount Memory Card
+  remount(0x800);
 
-	return 0;
+  return 0;
 }
 
 int umountUsbUx0() {
-	// Destroy other apps
-	sceAppMgrDestroyOtherApp();
+  // Destroy other apps
+  sceAppMgrDestroyOtherApp();
 
-	// Restore ux0: patch
-	shellUserUnredirectUx0();
+  // Restore ux0: patch
+  if (checkFileExist("sdstor0:xmc-lp-ign-userext"))
+    shellUserRedirectUx0("sdstor0:xmc-lp-ign-userext", "sdstor0:xmc-lp-ign-userext");
+  else
+    shellUserRedirectUx0("sdstor0:int-lp-ign-userext", "sdstor0:int-lp-ign-userext");
 
-	// Remount and relaunch
-	char * const argv[] = { "umount", NULL };
-	remountRelaunch(argv);
+  // Remount Memory Card
+  remount(0x800);
 
-	return 0;
+  // Remount uma0:
+  remount(0xF00);
+
+  return 0;
 }
 
 SceUID startUsb(const char *usbDevicePath, const char *imgFilePath, int type) {
-	SceUID modid = -1;
-	int res;
+  SceUID modid = -1;
+  int res;
 
-	// Destroy other apps
-	sceAppMgrDestroyOtherApp();
+  // Destroy other apps
+  sceAppMgrDestroyOtherApp();
 
-	// Load and start usbdevice module
-	res = taiLoadStartKernelModule(usbDevicePath, 0, NULL, 0);
-	if (res < 0)
-		goto ERROR_LOAD_MODULE;
+  // Load and start usbdevice module
+  res = taiLoadStartKernelModule(usbDevicePath, 0, NULL, 0);
+  if (res < 0)
+    goto ERROR_LOAD_MODULE;
 
-	modid = res;
+  modid = res;
 
-	// Stop MTP driver
-	res = sceMtpIfStopDriver(1);
-	if (res < 0)
-		goto ERROR_STOP_DRIVER;
+  // Stop MTP driver
+  res = sceMtpIfStopDriver(1);
+  if (res < 0 && res != 0x8054360C)
+    goto ERROR_STOP_DRIVER;
 
-	// Set device information
-	res = sceUsbstorVStorSetDeviceInfo("\"PS Vita\" MC", "1.00");
-	if (res < 0)
-		goto ERROR_USBSTOR_VSTOR;
+  // Set device information
+  res = sceUsbstorVStorSetDeviceInfo("\"PS Vita\" MC", "1.00");
+  if (res < 0)
+    goto ERROR_USBSTOR_VSTOR;
 
-	// Set image file path
-	res = sceUsbstorVStorSetImgFilePath(imgFilePath);
-	if (res < 0)
-		goto ERROR_USBSTOR_VSTOR;
+  // Set image file path
+  res = sceUsbstorVStorSetImgFilePath(imgFilePath);
+  if (res < 0)
+    goto ERROR_USBSTOR_VSTOR;
 
-	// Start USB storage
-	res = sceUsbstorVStorStart(type);
-	if (res < 0)
-		goto ERROR_USBSTOR_VSTOR;
+  // Start USB storage
+  res = sceUsbstorVStorStart(type);
+  if (res < 0)
+    goto ERROR_USBSTOR_VSTOR;
 
-	return modid;
+  return modid;
 
 ERROR_USBSTOR_VSTOR:
-	sceMtpIfStartDriver(1);
+  sceMtpIfStartDriver(1);
 
 ERROR_STOP_DRIVER:
-	taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
+  taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
 
 ERROR_LOAD_MODULE:
-	return res;
+  return res;
 }
 
 int stopUsb(SceUID modid) {
-	int res;
+  int res;
 
-	// Stop USB storage
-	res = sceUsbstorVStorStop();
-	if (res < 0)
-		return res;
+  // Stop USB storage
+  res = sceUsbstorVStorStop();
+  if (res < 0)
+    return res;
 
-	// Start MTP driver
-	res = sceMtpIfStartDriver(1);
-	if (res < 0)
-		return res;
+  // Start MTP driver
+  res = sceMtpIfStartDriver(1);
+  if (res < 0)
+    return res;
 
-	// Stop and unload usbdevice module
-	res = taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
-	if (res < 0)
-		return res;
+  // Stop and unload usbdevice module
+  res = taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
+  if (res < 0)
+    return res;
 
-	// Remount and relaunch
-	char * const argv[] = { "restart", NULL };
-	remountRelaunch(argv);
+  // Remount Memory Card
+  remount(0x800);
 
-	return 0;
+  // Remount imc0:
+  if (checkFolderExist("imc0:"))
+    remount(0xD00);
+
+  // Remount xmc0:
+  if (checkFolderExist("xmc0:"))
+    remount(0xE00);
+
+  // Remount uma0:
+  if (checkFolderExist("uma0:"))
+    remount(0xF00);
+
+  return 0;
 }
